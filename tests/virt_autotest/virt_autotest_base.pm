@@ -165,6 +165,7 @@ sub execute_script_run {
 
     enter_cmd "(" . $cmd . "; echo $pattern) 2>&1 | tee -a /dev/$serialdev";
     $self->{script_output} = wait_serial($pattern, $timeout);
+    record_info("Script Output TTTTT", $self->{script_output});
     save_screenshot;
 
     if (!$self->{script_output} or !defined $self->{script_output}) {
@@ -212,7 +213,7 @@ sub run_test {
 
 sub add_junit_log {
     my ($self, $job_output) = @_;
-
+    record_info("Job Output TTTTT", $job_output);
     # Parse test result and generate junit file
     my $tc_result = $self->analyzeResult($job_output);
     my $xml_result = $self->generateXML($tc_result);

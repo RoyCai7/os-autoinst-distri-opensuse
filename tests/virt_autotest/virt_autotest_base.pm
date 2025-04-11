@@ -148,6 +148,7 @@ sub post_run_test {
     my $self = shift;
 
     if ($self->{add_junit_log_flag} eq "yes") {
+        record_info('script_output', "Before add_junit_log: $self->{script_output}");
         $self->add_junit_log($self->{script_output});
     }
 
@@ -205,6 +206,7 @@ sub run_test {
 
     $self->save_test_configuration($assert_pattern, $add_junit_log_flag, $upload_virt_log_flag, $log_dir, $compressed_log_name, $upload_guest_assets_flag);
     $self->execute_script_run($test_cmd, $timeout);
+    record_info('script_output', "After execute_script_run: $self->{script_output}");
     $self->post_execute_script_run;
     $self->post_run_test;
     save_screenshot;
@@ -214,6 +216,7 @@ sub add_junit_log {
     my ($self, $job_output) = @_;
 
     # Parse test result and generate junit file
+    record_info('job_output', "Before analyzeResult: $job_output");
     my $tc_result = $self->analyzeResult($job_output);
     my $xml_result = $self->generateXML($tc_result);
     # Upload and parse junit file.

@@ -68,6 +68,7 @@ sub get_script_run {
 
 sub analyzeResult {
     my ($self, $text) = @_;
+    record_info('analyzeResult', "Inside analyzeResult: $text");
     my $result;
     # In the case the log does not tell the exact failure
     if ($text !~ /Overall guest upgrade result is:(.*)Test done/s) {

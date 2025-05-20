@@ -292,7 +292,7 @@ sub integration_services_check_ip {
     }
     $ips_host_pov =~ m/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/;
     $ips_host_pov = $1;
-    # Guest-side of Integration Services
+    # Guest-side of Integration Services.
     my $ips_guest_pov = script_output("default_iface=\$(awk '\$2 == 00000000 { print \$1 }' /proc/net/route); ip addr show dev \"\$default_iface\" | awk '\$1 == \"inet\" { sub(\"/.*\", \"\", \$2); print \$2 }'");
     record_info('IP (host)', $ips_host_pov);
     record_info('IP (guest)', $ips_guest_pov);

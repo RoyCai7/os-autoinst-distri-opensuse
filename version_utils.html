@@ -35,12 +35,14 @@
       <li><a href="#is_leap">is_leap</a></li>
       <li><a href="#is_opensuse">is_opensuse</a></li>
       <li><a href="#is_sle">is_sle</a></li>
+      <li><a href="#is_sled">is_sled</a></li>
       <li><a href="#is_transactional">is_transactional</a></li>
       <li><a href="#is_sles4migration">is_sles4migration</a></li>
       <li><a href="#is_sles4sap">is_sles4sap</a></li>
       <li><a href="#is_sles4sap_standard">is_sles4sap_standard</a></li>
       <li><a href="#is_rt">is_rt</a></li>
       <li><a href="#is_hpc">is_hpc</a></li>
+      <li><a href="#is_wsl">is_wsl</a></li>
       <li><a href="#is_released">is_released</a></li>
       <li><a href="#is_staging">is_staging</a></li>
       <li><a href="#is_storage_ng">is_storage_ng</a></li>
@@ -69,12 +71,17 @@
       <li><a href="#is_tunneled">is_tunneled</a></li>
       <li><a href="#is_bootloader_grub2">is_bootloader_grub2</a></li>
       <li><a href="#is_bootloader_sdboot">is_bootloader_sdboot</a></li>
+      <li><a href="#is_bootloader_grub2_bls">is_bootloader_grub2_bls</a></li>
+      <li><a href="#get_bootloader">get_bootloader</a></li>
+      <li><a href="#get_default_bootloader">get_default_bootloader</a></li>
       <li><a href="#is_plasma6">is_plasma6</a></li>
       <li><a href="#has_test_issues">has_test_issues</a></li>
       <li><a href="#package_version_cmp">package_version_cmp</a></li>
       <li><a href="#is_quarterly_iso">is_quarterly_iso</a></li>
       <li><a href="#get_version_id">get_version_id</a></li>
       <li><a href="#is_community_jeos">is_community_jeos</a></li>
+      <li><a href="#has_selinux_by_default">has_selinux_by_default</a></li>
+      <li><a href="#is_agama">is_agama</a></li>
     </ul>
   </li>
 </ul><h1>lib/version_utils.pm</h1>
@@ -165,6 +172,10 @@
 
 <p>Check if distribution is SLE with optional filter for: Version: &lt;=12-sp3 =12-sp1 &gt;11-sp1 &gt;=15 15+ (&gt;=15 and 15+ are equivalent)</p>
 
+<h2 id="is_sled">is_sled</h2>
+
+<p>Check if distribution is SLED</p>
+
 <h2 id="is_transactional">is_transactional</h2>
 
 <p>Returns true if called on a transactional server</p>
@@ -188,6 +199,10 @@
 <h2 id="is_hpc">is_hpc</h2>
 
 <p>Returns true if called in an HPC test</p>
+
+<h2 id="is_wsl">is_wsl</h2>
+
+<p>Returns true if called on a wsl build</p>
 
 <h2 id="is_released">is_released</h2>
 
@@ -309,7 +324,7 @@
 
 <h2 id="verify_os_version">verify_os_version</h2>
 
-<p>Returns 1 (true) if os release version matches the one passed as arguement. If no arguements are given, the function will compare the os release version in /etc/os-release file with &quot;VERSION&quot; var.</p>
+<p>Returns 1 (true) if os release version matches the one passed as arguement. If no arguements are given, the function will compare the os release version in /etc/os-release file with &quot;VERSION&quot; or &quot;VARIANT&quot; var. VARIANT contains the version on SL Micro/Microos from 6.2.</p>
 
 <h2 id="is_public_cloud">is_public_cloud</h2>
 
@@ -334,6 +349,18 @@
 <h2 id="is_bootloader_sdboot">is_bootloader_sdboot</h2>
 
 <p>Returns true if the SUT uses systemd-boot as bootloader</p>
+
+<h2 id="is_bootloader_grub2_bls">is_bootloader_grub2_bls</h2>
+
+<p>Returns true if the SUT uses GRUB2-BLS as bootloader</p>
+
+<h2 id="get_bootloader">get_bootloader</h2>
+
+<p>Returns the expected bootloader based on test variables can be grub2, grub2-bls or systemd-boot</p>
+
+<h2 id="get_default_bootloader">get_default_bootloader</h2>
+
+<p>Returns the default bootloader, can be grub2, grub2-bls or sdboot This is a helper function for unit tests.</p>
 
 <h2 id="is_plasma6">is_plasma6</h2>
 
@@ -362,6 +389,14 @@
 <h2 id="is_community_jeos">is_community_jeos</h2>
 
 <p>Returns true for tests using the images built by the &quot;JeOS&quot; package on OBS</p>
+
+<h2 id="has_selinux_by_default">has_selinux_by_default</h2>
+
+<p>Returns true if the distro has SELinux as default MAC</p>
+
+<h2 id="is_agama">is_agama</h2>
+
+<p>Check if agama installation is being used</p>
 
 
 </body>

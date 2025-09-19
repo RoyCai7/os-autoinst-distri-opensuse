@@ -15,16 +15,18 @@
   <li><a href="#DESCRIPTION">DESCRIPTION</a>
     <ul>
       <li><a href="#run_cmd-run_cmd-cmd-command-runas-user-timeout-60">run_cmd run_cmd(cmd =&gt; &#39;command&#39;, [runas =&gt; &#39;user&#39;, timeout =&gt; 60]);</a></li>
+      <li><a href="#run_cmd_retry-run_cmd_retry-cmd-command-retry-3-timeout-60-delay-10">run_cmd_retry run_cmd_retry(cmd =&gt; &#39;command&#39;, [retry =&gt; 3, timeout =&gt; 60, delay =&gt; 10]);</a></li>
       <li><a href="#get_promoted_hostname-get_promoted_hostname">get_promoted_hostname() get_promoted_hostname();</a></li>
       <li><a href="#sles4sap_cleanup">sles4sap_cleanup</a></li>
       <li><a href="#get_hana_topology-Parses-command-output-returns-hash-of-hashes-containing-values-for-each-host">get_hana_topology Parses command output, returns hash of hashes containing values for each host.</a></li>
       <li><a href="#is_hana_online-is_hana_online-timeout-120-wait_for_start-false">is_hana_online is_hana_online([timeout =&gt; 120, wait_for_start =&gt; &#39;false&#39;]);</a></li>
       <li><a href="#is_hana_resource_running-is_hana_resource_running-quiet-0">is_hana_resource_running is_hana_resource_running([quiet =&gt; 0]);</a></li>
+      <li><a href="#is_hana_node_up-is_hana_node_up-my_instance-timeout-900">is_hana_node_up is_hana_node_up($my_instance, [timeout =&gt; 900]);</a></li>
       <li><a href="#stop_hana-stop_hana-timeout-timeout-method-method">stop_hana stop_hana([timeout =&gt; $timeout, method =&gt; $method]);</a></li>
       <li><a href="#start_hana-start_hana-timeout-60">start_hana start_hana([timeout =&gt; 60]);</a></li>
       <li><a href="#cleanup_resource-cleanup_resource-timeout-60">cleanup_resource cleanup_resource([timeout =&gt; 60]);</a></li>
       <li><a href="#check_takeover-check_takeover">check_takeover check_takeover();</a></li>
-      <li><a href="#enable_replication-enable_replication-site_name-site_a">enable_replication enable_replication([site_name =&gt; &#39;site_a&#39;]);</a></li>
+      <li><a href="#enable_replication-enable_replication-site_name-site_a-hana_inn-10">enable_replication enable_replication([site_name =&gt; &#39;site_a&#39;, hana_inn =&gt; &#39;10&#39; ]);</a></li>
       <li><a href="#get_replication_info-get_replication_info">get_replication_info get_replication_info();</a></li>
       <li><a href="#get_promoted_instance-get_promoted_instance">get_promoted_instance get_promoted_instance();</a></li>
       <li><a href="#wait_for_sync-wait_for_sync-timeout-timeout">wait_for_sync wait_for_sync([timeout =&gt; $timeout]);</a></li>
@@ -35,7 +37,6 @@
       <li><a href="#cloud_file_content_replace-cloud_file_content_replace-filename-filename-search_pattern-search_pattern-replace_with-replace_with">cloud_file_content_replace cloud_file_content_replace(filename =&gt; $filename, search_pattern =&gt; $search_pattern, replace_with =&gt; $replace_with);</a></li>
       <li><a href="#create_instance_data">create_instance_data</a></li>
       <li><a href="#deployment_name">deployment_name</a></li>
-      <li><a href="#delete_network_peering">delete_network_peering</a></li>
       <li><a href="#create_ansible_playbook_list">create_ansible_playbook_list</a></li>
       <li><a href="#azure_fencing_agents_playbook_args">azure_fencing_agents_playbook_args</a></li>
       <li><a href="#get_hana_site_names">get_hana_site_names</a></li>
@@ -49,6 +50,7 @@
       <li><a href="#saphanasr_showAttr_version">saphanasr_showAttr_version</a></li>
       <li><a href="#wait_for_cluster">wait_for_cluster</a></li>
       <li><a href="#wait_for_zypper">wait_for_zypper</a></li>
+      <li><a href="#check_zypper_ref">check_zypper_ref</a></li>
       <li><a href="#wait_for_idle">wait_for_idle</a></li>
     </ul>
   </li>
@@ -89,21 +91,50 @@ otherwise it will be executed as root.</code></pre>
 </dd>
 </dl>
 
+<h2 id="run_cmd_retry-run_cmd_retry-cmd-command-retry-3-timeout-60-delay-10">run_cmd_retry run_cmd_retry(cmd =&gt; &#39;command&#39;, [retry =&gt; 3, timeout =&gt; 60, delay =&gt; 10]);</h2>
+
+<pre><code>Runs a command C&lt;cmd&gt; via ssh in the given VM and log the output.
+If command fails or C&lt;timeout&gt; is reached, then the command will be
+retried for C&lt;retry&gt; times, with C&lt;delay&gt; seconds of interval in between.</code></pre>
+
+<dl>
+
+<dt id="cmd---command-string-to-be-executed-remotely1"><b>cmd</b> - command string to be executed remotely</dt>
+<dd>
+
+</dd>
+<dt id="timeout---command-execution-timeout1"><b>timeout</b> - command execution timeout</dt>
+<dd>
+
+</dd>
+<dt id="retry---number-of-retry-attempts"><b>retry</b> - number of retry attempts</dt>
+<dd>
+
+</dd>
+<dt id="delay---idle-time-between-retry-attempts"><b>delay</b> - idle time between retry attempts</dt>
+<dd>
+
+</dd>
+<dt id="pass-through-all-other-arguments-supported-by-run_cmd"><b>...</b> - pass through all other arguments supported by run_cmd</dt>
+<dd>
+
+</dd>
+</dl>
+
 <h2 id="get_promoted_hostname-get_promoted_hostname">get_promoted_hostname() get_promoted_hostname();</h2>
 
 <pre><code>Checks and returns hostname of HANA promoted node according to crm shell output.</code></pre>
 
 <h2 id="sles4sap_cleanup">sles4sap_cleanup</h2>
 
-<pre><code>Clean up Network peering and qesap deployment</code></pre>
+<pre><code>Clean up Network peering and qesap deployment
+This method does not internally die and try to execute
+terraform destroy in any case.
+Return 0 if no internal error.</code></pre>
 
 <dl>
 
 <dt id="cleanup_called---flag-to-indicate-cleanup-status"><b>cleanup_called</b> - flag to indicate cleanup status</dt>
-<dd>
-
-</dd>
-<dt id="network_peering_present---flag-to-indicate-network-peering-presence"><b>network_peering_present</b> - flag to indicate network peering presence</dt>
 <dd>
 
 </dd>
@@ -133,11 +164,27 @@ otherwise it will be executed as root.</code></pre>
 
 <h2 id="is_hana_resource_running-is_hana_resource_running-quiet-0">is_hana_resource_running is_hana_resource_running([quiet =&gt; 0]);</h2>
 
-<pre><code>Checks if resource msl_SAPHana_* is running on given node.</code></pre>
+<pre><code>Checks if resource msl_SAPHanaCtl_* is running on given node.</code></pre>
 
 <dl>
 
 <dt id="quiet---if-set-returns-the-value-without-recording-info-default:-0"><b>quiet</b> - if set, returns the value without recording info (default: 0)</dt>
+<dd>
+
+</dd>
+</dl>
+
+<h2 id="is_hana_node_up-is_hana_node_up-my_instance-timeout-900">is_hana_node_up is_hana_node_up($my_instance, [timeout =&gt; 900]);</h2>
+
+<pre><code>Waits until &#39;is-system-running&#39; returns successfully on the target instance.</code></pre>
+
+<dl>
+
+<dt id="instance---the-instance-the-test-needs-to-wait-for"><b>instance</b> - the instance the test needs to wait for</dt>
+<dd>
+
+</dd>
+<dt id="timeout---how-much-time-to-wait-for-before-aborting"><b>timeout</b> - how much time to wait for before aborting</dt>
 <dd>
 
 </dd>
@@ -148,7 +195,7 @@ otherwise it will be executed as root.</code></pre>
 <pre><code>Stops HANA database using default or specified method.
 &quot;stop&quot; - stops database using &quot;HDB stop&quot; command.
 &quot;kill&quot; - kills database processes using &quot;HDB -kill&quot; command.
-&quot;crash&quot; - crashes entire os using &quot;/proc-sysrq-trigger&quot; method.</code></pre>
+&quot;crash&quot; - crashes entire OS using &quot;/proc/sysrq-trigger&quot; method.</code></pre>
 
 <dl>
 
@@ -168,7 +215,7 @@ otherwise it will be executed as root.</code></pre>
 
 <h2 id="cleanup_resource-cleanup_resource-timeout-60">cleanup_resource cleanup_resource([timeout =&gt; 60]);</h2>
 
-<pre><code>Cleanup resource &#39;msl_SAPHana_*&#39;, wait for DB start automatically.</code></pre>
+<pre><code>Cleanup resource &#39;msl_SAPHanaCtl_*&#39;, wait for DB start automatically.</code></pre>
 
 <dl>
 
@@ -182,13 +229,19 @@ otherwise it will be executed as root.</code></pre>
 
 <pre><code>Checks takeover status and waits for finish until successful or reaches timeout.</code></pre>
 
-<h2 id="enable_replication-enable_replication-site_name-site_a">enable_replication enable_replication([site_name =&gt; &#39;site_a&#39;]);</h2>
+<h2 id="enable_replication-enable_replication-site_name-site_a-hana_inn-10">enable_replication enable_replication([site_name =&gt; &#39;site_a&#39;, hana_inn =&gt; &#39;10&#39; ]);</h2>
 
-<pre><code>Enables replication on fenced database. Database needs to be offline.</code></pre>
+<pre><code>Re-enables replication on the previously fenced database node. Database must be offline.
+Dies if the the given &lt;site name&gt; doesn&#39;t correspond with the SAPHanaSR topology local site name
+Optionaly the &#39;hana_innstance_id&#39; could be provided for better reliability</code></pre>
 
 <dl>
 
-<dt id="site_name---site-name-of-the-site-to-register"><b>site_name</b> - site name of the site to register</dt>
+<dt id="site_name---local-HANA-site-name-of-the-site-to-be-registered"><b>site_name</b> - local HANA site name of the site to be registered</dt>
+<dd>
+
+</dd>
+<dt id="hana_inn---optional-HANA-instance-number-to-be-registered"><b>hana_inn</b> - optional HANA instance number to be registered</dt>
 <dd>
 
 </dd>
@@ -306,11 +359,6 @@ class instances.</code></pre>
 <pre><code>Return a string to be used as value for the deployment_name variable
 in the qe-sap-deployment.</code></pre>
 
-<h2 id="delete_network_peering">delete_network_peering</h2>
-
-<pre><code>Delete network peering between SUT created with qe-sa-deployment
-and the IBS Mirror. Function is generic over all the Cloud Providers</code></pre>
-
 <h2 id="create_ansible_playbook_list">create_ansible_playbook_list</h2>
 
 <pre><code>Detects HANA/HA scenario from function arguments and returns a list of ansible playbooks to include
@@ -322,7 +370,15 @@ in the &quot;ansible: create:&quot; section of config.yaml file.</code></pre>
 <dd>
 
 </dd>
-<dt id="registration---select-registration-mode-possible-values-are-registercloudguest-default-suseconnect-noreg-QESAP_SCC_NO_REGISTER-skips-scc-registration-via-ansible"><b>registration</b> - select registration mode, possible values are * registercloudguest (default) * suseconnect * noreg &quot;QESAP_SCC_NO_REGISTER&quot; skips scc registration via ansible</dt>
+<dt id="registration---select-registration-mode-possible-values-are-registercloudguest-default-suseconnect-noreg-skip-scheduling-of-register.yaml-at-all"><b>registration</b> - select registration mode, possible values are * registercloudguest (default) * suseconnect * noreg skip scheduling of register.yaml at all</dt>
+<dd>
+
+</dd>
+<dt id="scc_code---registration-code"><b>scc_code</b> - registration code</dt>
+<dd>
+
+</dd>
+<dt id="ltss---name-and-reg_code-for-LTSS-extension-to-register.-This-argument-is-a-two-element-comma-separated-list-string.-Like:-SLES-LTSS-Extended-Security-12.5-x86_64-123456789-First-string-before-the-comma-has-to-be-a-valid-SCC-extension-name-later-used-by-Ansible-as-argument-for-SUSEConnect-or-registercloudguest-argument.-Second-string-has-to-be-valid-registration-code-for-the-particular-LTSS-extension"><b>ltss</b> - name and reg_code for LTSS extension to register. This argument is a two element comma separated list string. Like: &#39;SLES-LTSS-Extended-Security/12.5/x86_64,123456789&#39; First string before the comma has to be a valid SCC extension name, later used by Ansible as argument for SUSEConnect or registercloudguest argument. Second string has to be valid registration code for the particular LTSS extension.</dt>
 <dd>
 
 </dd>
@@ -330,15 +386,43 @@ in the &quot;ansible: create:&quot; section of config.yaml file.</code></pre>
 <dd>
 
 </dd>
+<dt id="fence_type---select-Azure-native-fencing-mechanism.-Only-two-accepted-values-spn-or-msi.-This-argument-is-only-applicable-to-Azure.-optional"><b>fence_type</b> - select Azure native fencing mechanism. Only two accepted values &#39;spn&#39; or &#39;msi&#39;. This argument is only applicable to Azure. (optional)</dt>
+<dd>
+
+</dd>
+<dt id="spn_application_id---Application-ID-for-the-SPN-Azure-native-fencing-agent.This-argument-is-only-applicable-to-Azure-configured-with-native-fencing-of-type-SPN.-optional"><b>spn_application_id</b> - Application ID for the SPN Azure native fencing agent.This argument is only applicable to Azure configured with native fencing of type SPN. (optional)</dt>
+<dd>
+
+</dd>
+<dt id="spn_application_password---password-for-the-SPN-Azure-native-fencing-agent.This-argument-is-only-applicable-to-Azure-configured-with-native-fencing-of-type-SPN.-optional"><b>spn_application_password</b> - password for the SPN Azure native fencing agent.This argument is only applicable to Azure configured with native fencing of type SPN. (optional)</dt>
+<dd>
+
+</dd>
 <dt id="ptf_files---list-of-PTF-files-optional"><b>ptf_files</b> - list of PTF files (optional)</dt>
 <dd>
 
 </dd>
-<dt id="token---SAS-token-to-access-the-PTF-files-optional"><b>token</b> - SAS token to access the PTF files (optional)</dt>
+<dt id="ptf_token---SAS-token-to-access-the-PTF-files-optional"><b>ptf_token</b> - SAS token to access the PTF files (optional)</dt>
 <dd>
 
 </dd>
-<dt id="container---name-of-the-container-for-PTF-files"><b>container</b> - name of the container for PTF files</dt>
+<dt id="ptf_account---name-of-the-account-for-the-ptf-container-optional"><b>ptf_account</b> - name of the account for the ptf container (optional)</dt>
+<dd>
+
+</dd>
+<dt id="ptf_container---name-of-the-container-for-PTF-files-optional"><b>ptf_container</b> - name of the container for PTF files (optional)</dt>
+<dd>
+
+</dd>
+<dt id="ibsm_ip---IP-address-of-the-IBS-Mirror-optional"><b>ibsm_ip</b> - IP address of the IBS Mirror (optional)</dt>
+<dd>
+
+</dd>
+<dt id="download_hostname---hostname-associated-to-the-IBS-Mirror-IP-address-on-each-hana-node-optional"><b>download_hostname</b> - hostname associated to the IBS Mirror IP address on each hana node (optional)</dt>
+<dd>
+
+</dd>
+<dt id="repos---comma-separated-list-of-repos-optional"><b>repos</b> - comma separated list of repos (optional)</dt>
 <dd>
 
 </dd>
@@ -381,7 +465,8 @@ it behind a function is to have coherent defaults.</code></pre>
 
 <h2 id="create_hana_vars_section">create_hana_vars_section</h2>
 
-<pre><code>Detects HANA/HA scenario from openQA variables and creates &quot;terraform: variables:&quot; section in config.yaml file.</code></pre>
+<pre><code>Detects HANA/HA scenario from openQA variables and create
+data later used for &quot;ansible: hana_vars:&quot; section in config.yaml file.</code></pre>
 
 <h2 id="display_full_status">display_full_status</h2>
 
@@ -491,6 +576,22 @@ Returns normally if Zypper is not locked or dies after a maximum number of retri
 
 </dd>
 <dt id="runas---If-runas-defined-command-will-be-executed-as-specified-user-otherwise-it-will-be-executed-as-cloudadmin"><b>runas</b> - If &#39;runas&#39; defined, command will be executed as specified user, otherwise it will be executed as cloudadmin.</dt>
+<dd>
+
+</dd>
+</dl>
+
+<h2 id="check_zypper_ref">check_zypper_ref</h2>
+
+<pre><code>The function attempts to run &#39;zypper ref&#39; and check for errors related to repositories.</code></pre>
+
+<dl>
+
+<dt id="instance---The-instance-object-on-which-the-Zypper-command-is-executed.-This-object-must-have-the-run_ssh_command-method-implemented1"><b>$instance</b> - The instance object on which the Zypper command is executed. This object must have the run_ssh_command method implemented.</dt>
+<dd>
+
+</dd>
+<dt id="runas---If-runas-defined-command-will-be-executed-as-specified-user-otherwise-it-will-be-executed-as-cloudadmin1"><b>runas</b> - If &#39;runas&#39; defined, command will be executed as specified user, otherwise it will be executed as cloudadmin.</dt>
 <dd>
 
 </dd>

@@ -29,6 +29,7 @@ if (get_var("VERSION")) {
     $guest_version = get_var("VERSION");
     $guest_version =~ s/-//;
     $guest_version =~ y/SP/sp/;
+    $guest_version =~ s/\.0$//;    # normalize "16.0" -> "16" (minimal, no other logic changes)
 }
 our %guests = ();
 if (get_var("REGRESSION", '') =~ /xen/) {
@@ -372,6 +373,9 @@ if (get_var("REGRESSION", '') =~ /xen/) {
         },
         sles15sp7 => {
             vm_name => 'sles-15.7_openQA-virtualization-maintenance',
+        },
+        sles16 => {
+            vm_name => 'sles-16.0_openQA-virtualization-maintenance',
         },
     );
     %guests = get_var('TERADATA') ? %guests{"sles${guest_version}TD"} : (get_var('INCIDENT_REPO') =~ /LTSS-Extended-Security/) ? %guests{"sles${guest_version}ES"} : %guests{"sles${guest_version}"};

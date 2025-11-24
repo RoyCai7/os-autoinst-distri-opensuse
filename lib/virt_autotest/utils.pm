@@ -631,38 +631,27 @@ sub create_guest {
     my $extra_args = get_var("VIRTINSTALL_EXTRA_ARGS", "") . " " . get_var("VIRTINSTALL_EXTRA_ARGS_" . uc($name), "");
     $extra_args = trim($extra_args);
 
-    # Handle installation method: SLES16 online uses ISO download, sle16 full use network location too
-    my $install_method = "location";    # Default to network installation (preserves SLES12/15 behavior)
-    my $install_source = $location;    # Default source (preserves SLES12/15 behavior)
+    # Handle installation method
+    my $install_method = "location";
+    my $install_source = $location;
 
-    # SLES16-specific ISO download logic (only when all conditions are met)
-    # Simplified SLES16 installation configuration
+    # SLES16 with iso_url uses ISO-based installation (online version)
     if (is_sles16_mu_virt_test() &&
         $name =~ /sles16/i &&
-        $guest->{distro} && $guest->{distro} eq 'SLE_16') {
+        $guest->{distro} && $guest->{distro} eq 'SLE_16' &&
+        defined($iso_url) && !defined($location)) {
 
-        # For SLES16, determine installation method based on available configuration
-        if (defined($iso_url)) {
-            # Try ISO download and extraction for --install method
-            my $local_iso_path = download_installation_iso($iso_url);
-            my $extract_result = $local_iso_path ? extract_kernel_initrd_from_iso($local_iso_path, $name) : undef;
+        my $local_iso_path = download_installation_iso($iso_url);
+        my $extract_result = $local_iso_path ? extract_kernel_initrd_from_iso($local_iso_path, $name) : undef;
 
-            if ($extract_result) {
-                $install_method = "install";
-                $install_source = $extract_result;
-                record_info("SLES16 Install", "Using --install method with extracted kernel/initrd");
-            } else {
-                my $error_msg = $local_iso_path ? "Kernel extraction failed" : "ISO download failed";
-                record_info("SLES16 Error", "$error_msg for online installation", result => 'fail');
-                die "SLES16 guest $name: $error_msg. Online installation cannot proceed.";
-            }
-        } elsif (defined($location)) {
-            # Use network location (full installation tree)
-            $install_method = "location";
-            $install_source = $location;
-            record_info("SLES16 Network", "Using network location: $location");
+        if ($extract_result) {
+            $install_method = "install";
+            $install_source = $extract_result;
+            record_info("SLES16 Install", "Using --install with kernel/initrd from ISO");
         } else {
-            die "SLES16 guest $name requires either iso_url or location to be defined";
+            my $error_msg = $local_iso_path ? "Kernel extraction failed" : "ISO download failed";
+            record_info("SLES16 Error", "$error_msg", result => 'fail');
+            die "SLES16 guest $name: $error_msg";
         }
     }
 
@@ -674,28 +663,18 @@ sub create_guest {
         $autoinstall_url = $autoyast;    # Can be autoyast XML or Agama jsonnet URL
         $diskformat = get_var("VIRT_QEMU_DISK_FORMAT") // "qcow2";
 
-        # For SLES16 MU virtualization tests, use inst.auto instead of autoyast parameter (Agama format)
+        # SLES16 uses Agama installer with inst.auto parameter
         if (is_sles16_mu_virt_test() && $name =~ /sles16/i) {
-            # SLES16 uses Agama installer - adjust parameters based on installation method
             my $sles16_args = "inst.auto=$autoinstall_url";
 
-            if ($install_method eq "install") {
-                # ISO installation: use inst.finish=reboot for automatic restart
-                $sles16_args .= " inst.finish=reboot";
-            } elsif ($install_method eq "location") {
-                # Network installation: add live root and install_url parameters (matching reference)
-                $sles16_args .= " root=live:$install_source/LiveOS/squashfs.img";
-                # Use install_url from guest configuration if available
-                if (defined($install_url)) {
-                    $sles16_args .= " inst.install_url=$install_url";
-                }
-                $sles16_args .= " inst.finish=reboot";
+            # Add install_url if provided (for full installation)
+            if (defined($install_url) && $install_url ne '') {
+                $sles16_args .= " inst.install_url=$install_url";
             }
+            $sles16_args .= " inst.finish=reboot";
 
-            # Combine with existing extra_args from environment variables
             $extra_args = "$sles16_args $extra_args";
-            my $method_info = $install_method eq "install" ? "ISO with inst.finish=reboot" : "network with install source";
-            record_info("SLES16 Guest", "Creating SLES16 guest with Agama inst.auto ($method_info)");
+            record_info("SLES16 Guest", "Using Agama installer");
         } else {
             # Traditional guests use autoyast
             $extra_args = "autoyast=$autoinstall_url $extra_args";
@@ -708,34 +687,22 @@ sub create_guest {
         # Add installation source based on method
         if ($install_method eq "cdrom") {
             $virtinstall .= " --cdrom $install_source";
-            record_info("Install Method", "Using CD-ROM installation: $install_source");
+            record_info("Install Method", "Using CD-ROM: $install_source");
         } elsif ($install_method eq "install") {
-            # Use --install method with extracted kernel and initrd
             my $kernel_path = $install_source->{kernel};
             my $initrd_path = $install_source->{initrd};
-            my $iso_path = $install_source->{iso_path};
 
             $virtinstall .= " --install kernel=$kernel_path,initrd=$initrd_path";
-
-            # For SLES16, add root=live: parameter using squashfs.img URL instead of full ISO
-            if (is_sles16_mu_virt_test() && $name =~ /sles16/i && defined($iso_url)) {
-                # Convert ISO URL to squashfs.img URL for better memory efficiency
-                my $squashfs_url = $iso_url;
-                $squashfs_url =~ s/\/iso\//\/repo\//;    # Change /iso/ to /repo/
-                $squashfs_url =~ s/\.iso$/\/LiveOS\/squashfs.img/;    # Replace .iso with /LiveOS/squashfs.img
-                $extra_args = "root=live:$squashfs_url $extra_args";
-                record_info("SLES16 Root Live", "Added root=live parameter with squashfs.img: $squashfs_url");
-            }
-
-            record_info("Install Method", "Using --install with kernel: $kernel_path, initrd: $initrd_path");
+            record_info("Install Method", "Using --install: $kernel_path, $initrd_path");
         } else {
-            # For SLES16 network installation, use format with explicit kernel/initrd paths
+            # Traditional --location (SLES12/15/16)
+            # SLES16 Agama uses different tree structure, need --install with kernel/initrd paths
             if (is_sles16_mu_virt_test() && $name =~ /sles16/i) {
-                $virtinstall .= " --location $install_source,kernel=boot/x86_64/loader/linux,initrd=boot/x86_64/loader/initrd";
-                record_info("Install Method", "Using SLES16 network location with explicit kernel/initrd");
+                $virtinstall .= " --install kernel=$install_source/boot/x86_64/loader/linux,initrd=$install_source/boot/x86_64/loader/initrd";
+                record_info("Install Method", "Using --install for SLES16: $install_source");
             } else {
                 $virtinstall .= " --location=$install_source";
-                record_info("Install Method", "Using network location: $install_source");
+                record_info("Install Method", "Using --location: $install_source");
             }
         }
 

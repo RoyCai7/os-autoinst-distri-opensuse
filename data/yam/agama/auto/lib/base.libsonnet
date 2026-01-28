@@ -1,7 +1,7 @@
 {
   bootloader(bootloader, bootloader_timeout, bootloader_extra_kernel_params):: {
     [if bootloader || bootloader_timeout != '' || bootloader_extra_kernel_params != '' then 'bootloader']: std.prune({
-      [if bootloader then 'stopOnBootMenu']: true,
+      [if bootloader then 'timeout']: 10,
       [if bootloader_timeout then 'timeout']: 15,
       [if bootloader_extra_kernel_params != '' then 'extraKernelParams']: bootloader_extra_kernel_params,
     }),

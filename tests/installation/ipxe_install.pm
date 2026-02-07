@@ -376,9 +376,20 @@ sub run {
     }
 
     if (is_agama) {
-        assert_screen([qw(load-linux-kernel load-initrd)], 240);
+        # Check every 1 seconds for 100 seconds to capture more screenshots
+        my $matched = 0;
+        for (my $i = 0; $i < 100; $i++) {
+            if (check_screen([qw(load-linux-kernel load-initrd)], 1)) {
+                $matched = 1;
+                last;
+            }
+            save_screenshot;
+        }
+        # Fast fail if we didn't match the expected screen
+        die "Failed to match 'load-linux-kernel' or 'load-initrd' after 300 seconds" unless $matched;
+        
         record_info("Installing", "Please check the expected product is being installed");
-        assert_screen('agama-installer-live-root', 400);
+        assert_screen('agama-installer-live-root', 400) or die "Failed to reach agama-installer-live-root within 400 seconds";
         set_bootscript_hdd if get_var('IPXE_SET_HDD_BOOTSCRIPT');
         return;
     }

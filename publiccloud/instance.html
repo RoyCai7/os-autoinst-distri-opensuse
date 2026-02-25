@@ -14,8 +14,8 @@
 <ul id="index"><li><a href="../index.html"><i>&lt;= Back to file list</i></a></li>
   <li>
     <ul>
-      <li><a href="#run_ssh_command">run_ssh_command</a></li>
       <li><a href="#retry_ssh_command">retry_ssh_command</a></li>
+      <li><a href="#apply_cmd_timeout-_apply_cmd_timeout-args-ssh_cmd---wraps-ssh_cmd-within-timeout-call-which-will-make-sure-graceful-and-unconditional-interruption-after-defined-period-of-time">_apply_cmd_timeout _apply_cmd_timeout($args, $ssh_cmd) - wraps $ssh_cmd within timeout call which will make sure graceful and unconditional interruption after defined period of time</a></li>
       <li><a href="#ssh_script_run">ssh_script_run</a></li>
       <li><a href="#ssh_assert_script_run">ssh_assert_script_run</a></li>
       <li><a href="#ssh_script_output">ssh_script_output</a></li>
@@ -38,12 +38,6 @@
   </li>
 </ul><h1>lib/publiccloud/instance.pm</h1>
 
-<h2 id="run_ssh_command">run_ssh_command</h2>
-
-<pre><code>run_ssh_command(cmd =&gt; &#39;command&#39;[, timeout =&gt; 90][, ssh_opts =&gt;&#39;..&#39;][, username =&gt; &#39;XXX&#39;][, no_quote =&gt; 0][, rc_only =&gt; 0]);</code></pre>
-
-<p>Runs a command <code>cmd</code> via ssh in the given VM. Retrieves the output. If the command retrieves not zero, an exception is thrown. Timeout can be set by <code>timeout</code> or 90 sec by default. <code>&lt;proceed_on_failure=</code>1&gt;&gt; allows to proceed with validation when <code>cmd</code> is failing (return non-zero exit code) By default, the command is passed in single quotes to SSH. To avoid quoting use <code>&lt;no_quote=</code>1&gt;&gt;. With <code>&lt;ssh_opts=</code>&#39;...&#39;&gt;&gt; you can overwrite all default ops which are in <code>&lt;$instance-</code>ssh_opts&gt;&gt;. Use argument <code>username</code> to specify a different username then <code>&lt;$instance-</code>username()&gt;&gt;. Use argument <code>rc_only</code> to only check for the return code of the command.</p>
-
 <h2 id="retry_ssh_command">retry_ssh_command</h2>
 
 <pre><code>ssh_script_retry(command[, retry =&gt; 3][, delay =&gt; 10][, timeout =&gt; 90][, ssh_opts =&gt;&#39;..&#39;][, username =&gt; &#39;XXX&#39;][, no_quote =&gt; 0]);</code></pre>
@@ -52,9 +46,23 @@
 
 <p>This function is deprecated. Please use ssh_script_retry instead.</p>
 
+<h2 id="apply_cmd_timeout-_apply_cmd_timeout-args-ssh_cmd---wraps-ssh_cmd-within-timeout-call-which-will-make-sure-graceful-and-unconditional-interruption-after-defined-period-of-time">_apply_cmd_timeout _apply_cmd_timeout($args, $ssh_cmd) - wraps $ssh_cmd within timeout call which will make sure graceful and unconditional interruption after defined period of time</h2>
+
+<pre><code>C&lt;args&gt; - reference to args hash. it is important to pass reference so function can modify timeout passed to script_run by the caller
+            to make sure it is bigger than value defined in timeout command which suppose to kill what script_run needs to execute
+C&lt;ssh_cmd&gt; - reference to string containing command which will be executed by script_run. function will tweak it to include timeout call
+            which will kill underlying command after time defined by args{timeout}</code></pre>
+
 <h2 id="ssh_script_run">ssh_script_run</h2>
 
-<pre><code>ssh_script_run($cmd [, timeout =&gt; $timeout] [, fail_message =&gt; $fail_message] [,quiet =&gt; $quiet] [,ssh_opts =&gt; $ssh_opts] [,username =&gt; $username])</code></pre>
+<pre><code>ssh_script_run($cmd [, timeout =&gt; $timeout] [,quiet =&gt; $quiet] [,ssh_opts =&gt; $ssh_opts] [,username =&gt; $username][, ignore_timeout_failure =&gt; $ignore_timeout_failure])
+
+C&lt;timeout&gt; - TTL for command execution measured in seconds . After that period of time execution will be aborded
+C&lt;quiet&gt; - avoid recording serial_results ( value pass to script_run call)
+C&lt;ssh_opts&gt; - additional ssh options passed to ssh
+C&lt;username&gt; - username used for ssh tunnel
+C&lt;ignore_timeout_failure&gt; - in case waiting longer than timeout normally script_run will die. Setting this parameter to true
+    will avoid such failure</code></pre>
 
 <p>Runs a command <code>cmd</code> via ssh on the publiccloud instance and returns the return code.</p>
 
@@ -78,7 +86,7 @@
 
 <h2 id="scp">scp</h2>
 
-<pre><code>scp($from, $to, timeout =&gt; 90);</code></pre>
+<pre><code>scp($from, $to[, timeout =&gt; 90]);</code></pre>
 
 <p>Use scp to copy a file from or to this instance. A url starting with <code>remote:</code> is replaced with the IP from this instance. E.g. a call to copy the file <i>/var/log/cloudregister</i> to <i>/tmp</i> looks like: <code>&lt;&lt;$instance-</code>scp(&#39;remote:/var/log/cloudregister&#39;, &#39;/tmp&#39;);&gt;&gt;&gt;</p>
 
@@ -102,7 +110,7 @@
 
 <pre><code>wait_for_guestregister([timeout =&gt; 300]);</code></pre>
 
-<p>Run command <code>systemctl is-active guestregister</code> on the instance in a loop and wait till guestregister is ready. If guestregister finish with state failed, a soft-failure will be recorded. If guestregister will not finish within <code>timeout</code> seconds, job dies. In case of BYOS images we checking that service is inactive and quit Returns the time needed to wait for the guestregister to complete. <code>wait_for_guestregister</code> is called inside <code>create_instance()</code>, enabled by <code>check_guestregister</code></p>
+<p>Run command <code>systemctl is-active guestregister</code> on the instance in a loop and wait till guestregister is ready. If guestregister finish with state failed, a soft-failure will be recorded. If guestregister will not finish within <code>timeout</code> seconds, job dies. In case of BYOS images we checking that service is inactive and quit Returns the time needed to wait for the guestregister to complete.</p>
 
 <h2 id="update_instance_ip">update_instance_ip</h2>
 

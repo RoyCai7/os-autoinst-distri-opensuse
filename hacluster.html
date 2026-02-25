@@ -79,6 +79,7 @@
       <li><a href="#list_configured_sbd">list_configured_sbd</a></li>
       <li><a href="#sbd_device_report">sbd_device_report</a></li>
       <li><a href="#get_fencing_type">get_fencing_type</a></li>
+      <li><a href="#check_crm_nonroot">check_crm_nonroot</a></li>
     </ul>
   </li>
 </ul><h1>lib/hacluster.pm</h1>
@@ -541,6 +542,8 @@
 
 <p>Some HA tests modules will cause a node to fence. In these cases, the tests will need to assert a <b>grub2</b> or <b>bootmenu</b> screen, so the modules will need to select the <code>root-console</code> before any calls to <code>assert_screen</code>. On some systems, a simple call to <code>select_console &#39;root-console&#39;</code> will not work as the console could be &quot;dirty&quot; with messages obscuring the root prompt. This function will pre-select the console without asserting anything on the screen, clear it, and then select it normally.</p>
 
+<p>On PVM setup, serial connection may lose if jobs running too long from ssh termial, so re-connect it after switching back to root-console</p>
+
 <h2 id="crm_get_failcount">crm_get_failcount</h2>
 
 <pre><code>crm_get_failcount(crm_resource=&gt;&#39;ASCS_00&#39; [, assert_result=&gt;&#39;true&#39;]);</code></pre>
@@ -779,6 +782,19 @@
 <pre><code>get_fencing_type();</code></pre>
 
 <p>Checks which stonith resource type is configured using <b>crm shell</b>. Returns full type name (&#39;external/sbd&#39;, &#39;fence_azure_arm&#39;, ...).</p>
+
+<h2 id="check_crm_nonroot">check_crm_nonroot</h2>
+
+<pre><code>check_crm_nonroot();</code></pre>
+
+<p>Checks if non-root user run &#39;crm configure show&#39; successfully</p>
+
+<ul>
+
+<li><p><b>user</b> non-root user, usually be &lt;sid&gt;adm</p>
+
+</li>
+</ul>
 
 
 </body>

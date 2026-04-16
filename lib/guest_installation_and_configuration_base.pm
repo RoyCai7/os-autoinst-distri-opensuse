@@ -2594,7 +2594,7 @@ Password is required to access Agama installer shell using ssh. Passwordless ssh
 connection is more convenient for automation purpose, but password will still be
 used if passwordless ssh connection fails. Guest installation will be marked as
 'FAILED' if there is no way to establish ssh connection to Agama installer shell
-using publibc key, because Agama installe shell does support full ssh capability.
+using public key, because Agama installer shell does support full ssh capability.
 =cut
 
 sub setup_guest_agama_installation_shell {
@@ -2613,6 +2613,14 @@ sub setup_guest_agama_installation_shell {
         if (script_run("timeout --kill-after=1 --signal=9 60 ssh-copy-id -f $_ssh_command_options root\@$self->{guest_ipaddr}") != 0) {
             type_string("reset\n");
             wait_still_screen;
+            # Wait for SSH port to be reachable before retrying, to avoid
+            # assert_screen('password-prompt') timeout when sshd is not up yet (bsc#XXXXXX)
+            if (script_retry("nc -z -w 5 $self->{guest_ipaddr} 22", delay => 15, retry => 20, die => 0) != 0) {
+                $self->record_guest_installation_result('FAILED');
+                record_info("Guest $self->{guest_name} SSH port not reachable",
+                    "SSH port 22 on $self->{guest_ipaddr} not reachable after retries", result => 'fail');
+                return $self;
+            }
             enter_cmd("timeout --kill-after=1 --signal=9 180 ssh-copy-id -f $_ssh_command_options root\@$self->{guest_ipaddr}", wait_still_screen => 5, timeout => 210);
             assert_screen('password-prompt', timeout => 30);
             enter_cmd("novell", wait_screen_change => 60, max_interval => 1, timeout => 90);

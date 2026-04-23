@@ -2116,11 +2116,16 @@ sub config_guest_unattended_installation {
             $self->{guest_installation_automation_options} = "--extra-args \"ks=$self->{guest_installation_automation_file}\"" if (($self->{guest_os_name} =~ /oraclelinux/im) and ($self->{guest_version_major} lt 7));
         }
         elsif ($self->{guest_installation_automation_method} eq 'autoagama') {
+            # SLES 16.0 uses early Agama which only recognizes the "agama." prefix (agama.auto=, agama.finish=).
+            # SLES 16.1+ uses newer Agama which standardized on the "inst." prefix, keeping "agama." as a compat alias.
+            my $_is_old_agama = (($self->{guest_version_major} eq 16 and $self->{guest_version_minor} lt 1) or $self->{guest_version_major} lt 16);
+            my $_auto_param   = $_is_old_agama ? 'agama.auto'   : 'inst.auto';
+            my $_finish_param = $_is_old_agama ? 'agama.finish' : 'inst.finish';
             if ($self->{guest_installation_method} eq 'directkernel') {
-                $self->{guest_installation_fine_grained_kernel_args} .= ' inst.auto=' . $self->{guest_installation_automation_file} . ' inst.finish=stop';
+                $self->{guest_installation_fine_grained_kernel_args} .= " $_auto_param=" . $self->{guest_installation_automation_file} . " $_finish_param=stop";
             }
             elsif ($self->{guest_installation_method} eq 'location') {
-                $self->{guest_installation_extra_args} .= '#inst.auto=' . $self->{guest_installation_automation_file} . '#inst.finish=stop';
+                $self->{guest_installation_extra_args} .= "#$_auto_param=" . $self->{guest_installation_automation_file} . "#$_finish_param=stop";
             }
         }
         if (script_retry("curl -sSf $self->{guest_installation_automation_file} > /dev/null") ne 0) {
@@ -2657,7 +2662,7 @@ sub verify_guest_agama_installation_done {
             return $self;
         }
         while ($_wait_timeout > 0) {
-            enter_cmd("timeout --kill-after=1 --signal=9 120 journalctl -u agama -u agama-web-server.service| grep -E \\\"Install phase done|Installation finished\\\"", timeout => 150);
+            enter_cmd("timeout --kill-after=1 --signal=9 120 journalctl -u agama -u agama-web-server.service| grep -E \\\"Install.*phase done|Installation finished\\\"", timeout => 150);
             wait_still_screen(20);
             $_wait_timeout -= 20;
         }
@@ -2675,7 +2680,7 @@ sub verify_guest_agama_installation_done {
         $_ssh_command_options .= is_sle('16+') ? "-o PubkeyAcceptedAlgorithms=+ssh-ed25519 " : "-o PubkeyAcceptedAlgorithms=+ssh-rsa ";
         $_ssh_command_options .= "-i $_host_params{ssh_key_file}";
         while ($_wait_timeout > 0) {
-            if (script_run("timeout --kill-after=1 --signal=9 120 ssh $_ssh_command_options root\@$self->{guest_ipaddr} \"journalctl -u agama -u agama-web-server.service | grep -E \\\"Install phase done|Installation finished\\\"\"", timeout => 150) == 0) {
+            if (script_run("timeout --kill-after=1 --signal=9 120 ssh $_ssh_command_options root\@$self->{guest_ipaddr} \"journalctl -u agama -u agama-web-server.service | grep -E \\\"Install.*phase done|Installation finished\\\"\"", timeout => 150) == 0) {
                 record_info("Guest $self->{guest_name} agama install phase done", "Guest $self->{guest_name} ip address is $self->{guest_ipaddr}");
                 $self->record_guest_installation_result('AGAMA_INSTALL_PHASE_DONE');
                 return $self;

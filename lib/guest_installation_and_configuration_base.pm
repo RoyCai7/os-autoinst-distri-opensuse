@@ -326,6 +326,7 @@ sub prepare_non_transactional_environment {
     $self->reveal_myself;
     if (!is_transactional) {
         virt_autotest::utils::setup_rsyslog_host($_host_params{common_log_folder}) if (is_sle('<16'));
+        _wait_for_enabled_repositories();
         my $_packages_to_check = 'wget curl screen dnsmasq xmlstarlet python3 nmap';
         $_packages_to_check .= ' yast2-schema' if (is_sle('<16'));
         zypper_call("install -y $_packages_to_check");
@@ -333,6 +334,13 @@ sub prepare_non_transactional_environment {
         zypper_call("install -y -t pattern $self->{host_virt_type}_server $self->{host_virt_type}_tools") if (is_sle);
     }
     return $self;
+}
+
+sub _wait_for_enabled_repositories {
+    my $enabled_repo_check = q(grep -ERq '^enabled=1$' /etc/zypp/repos.d/*.repo);
+
+    script_retry($enabled_repo_check, retry => 12, delay => 10, timeout => 30, die => 0);
+    die('No enabled zypper repositories available on SUT') if script_run($enabled_repo_check) != 0;
 }
 
 =head2 clean_up_all_guests

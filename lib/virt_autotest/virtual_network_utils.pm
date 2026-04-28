@@ -662,8 +662,9 @@ $bridge_stp: 'on' or 'off' to turn stp on or off
 $bridge_forwarddelay: The stp forwarding delay in seconds
 If $ipaddr given is empty, it means there is no associated specific ip address
 to this interface which might be attached to another bridge interface or will not
-be assigned one ip address from dhcp, so set $ipaddr to '0.0.0.0'.If $ipaddr
-given is non-empty but not in ip address format,for example, 'host',it
+be assigned one ip address from dhcp. For ifcfg based networking it is converted
+to '0.0.0.0', while for NetworkManager the address is omitted when not needed.
+If $ipaddr given is non-empty but not in ip address format,for example, 'host',it
 means the interface will not use a ip address from pre-defined subnet and will
 automically accept dhcp ip address from public facing host network.
 
@@ -760,38 +761,27 @@ sub write_network_bridge_device_nmconnection {
     die("Interface name must be given otherwise network bridge device config can not be generated.") if (!$args{name});
 
     my $ret = 1;
-    my $configmethod = (($args{bootproto} eq 'dhcp') ? 'auto' : 'manual');
     my $autoconnect = (($args{startmode} eq 'auto') ? 'true' : 'false');
     my $autoconnect_ports = (($args{startmode} eq 'auto') ? 1 : 0);
     $args{bridge_stp} = (($args{bridge_stp} eq 'on') ? 'true' : 'false');
     script_run("cp /etc/NetworkManager/system-connections/$args{name}.nmconnection /etc/NetworkManager/system-connections/backup-$args{name}.nmconnection");
     script_run("cp /etc/NetworkManager/system-connections/backup-$args{name}.nmconnection $args{backup_folder}");
     my $bridge_device_config_file = '/etc/NetworkManager/system-connections/' . $args{name} . '.nmconnection';
+    my $ipv4_config = _build_network_bridge_nm_ipv4_config(%args);
+
+    my $connection_body = "[connection]\nautoconnect=$autoconnect\n";
+    $connection_body .= "autoconnect-ports=$autoconnect_ports\n" if (is_sle('>=16') && $args{bridge_type} eq 'master');
 
     if ($args{bridge_type} eq 'master') {
-        type_string("cat > $bridge_device_config_file <<EOF
-[connection]
-autoconnect=$autoconnect
-EOF
-");
-        type_string("cat >> $bridge_device_config_file <<EOF
-autoconnect-ports=$autoconnect_ports
-EOF
-") if (is_sle('>=16'));
-        type_string("cat >> $bridge_device_config_file <<EOF
-id=$args{name}
-permissions=
-interface-name=$args{name}
-type=bridge
-zone=$args{zone}
-[ipv4]
-method=$configmethod
-address1=$args{ipaddr}
-[bridge]
-stp=$args{bridge_stp}
-forward-delay=$args{bridge_forwarddelay}
-EOF
-");
+        $connection_body .= "id=$args{name}\n";
+        $connection_body .= "permissions=\n";
+        $connection_body .= "interface-name=$args{name}\n";
+        $connection_body .= "type=bridge\n";
+        $connection_body .= "zone=$args{zone}\n";
+        $connection_body .= $ipv4_config;
+        $connection_body .= "[bridge]\n";
+        $connection_body .= "stp=$args{bridge_stp}\n";
+        $connection_body .= "forward-delay=$args{bridge_forwarddelay}\n";
     }
     elsif ($args{bridge_type} eq 'slave') {
         my $interfacetype = '';
@@ -803,26 +793,31 @@ EOF
             $interfacename =~ s/\s*$args{name}\s*$//;
             $interfacetype = script_output("nmcli connection show \"$interfacename\" | grep connection.type | awk \'{print \$2}\'", proceed_on_failure => 0);
         }
-        type_string("cat > $bridge_device_config_file <<EOF
-[connection]
-autoconnect=$autoconnect
-id=$args{name}
-permissions=
-interface-name=$args{name}
-type=$interfacetype
-zone=$args{zone}
-slave-type=bridge
-master=$args{bridge_port}
-[ipv4]
-method=$configmethod
-address1=$args{ipaddr}
-EOF
-");
+        $connection_body .= "id=$args{name}\n";
+        $connection_body .= "permissions=\n";
+        $connection_body .= "interface-name=$args{name}\n";
+        $connection_body .= "type=$interfacetype\n";
+        $connection_body .= "zone=$args{zone}\n";
+        $connection_body .= "slave-type=bridge\n";
+        $connection_body .= "master=$args{bridge_port}\n";
+        $connection_body .= $ipv4_config;
     }
+
+    type_string("cat > $bridge_device_config_file <<EOF\n$connection_body" . "EOF\n");
     $ret = script_run("chmod 700 $bridge_device_config_file && cp $bridge_device_config_file $args{backup_folder}");
     $ret |= script_retry("nmcli connection load $bridge_device_config_file", retry => 3, die => 0);
     record_info("Network device $args{name} config $bridge_device_config_file", script_output("cat $bridge_device_config_file", proceed_on_failure => 0));
     return $ret;
+}
+
+sub _build_network_bridge_nm_ipv4_config {
+    my (%args) = @_;
+
+    return "[ipv4]\nmethod=auto\n" if ($args{bootproto} eq 'dhcp');
+    return "[ipv4]\nmethod=disabled\n" if ($args{bootproto} eq 'none');
+
+    die("IP address must be given for static NetworkManager bridge configuration.") if (!$args{ipaddr});
+    return "[ipv4]\nmethod=manual\naddress1=$args{ipaddr}\n";
 }
 
 =head2 activate_network_bridge_device
@@ -873,7 +868,10 @@ sub activate_network_bridge_device {
             script_retry("systemctl restart network", timeout => 60, delay => 15, retry => 3, die => 0);
         }
         virt_autotest::utils::reselect_openqa_console(address => get_required_var('SUT_IP'), counter => $args{reconsole_counter});
-        script_retry("nmcli connection up $args{host_device}", timeout => 60, delay => 15, retry => 3, die => 0) if is_networkmanager;
+        if (is_networkmanager) {
+            script_retry("ip route show default | grep -iw $args{bridge_device}", timeout => 30, delay => 5, retry => 12, die => 0);
+            script_retry("! ip route show default | grep -iw $args{host_device}", timeout => 30, delay => 5, retry => 12, die => 0) if ($args{host_device});
+        }
         $detect_active_route = script_output("ip route show default | grep -i $args{bridge_device}", proceed_on_failure => 1);
         $detect_inactive_route = script_output("ip route show default | grep -i $args{host_device}", proceed_on_failure => 1);
     }

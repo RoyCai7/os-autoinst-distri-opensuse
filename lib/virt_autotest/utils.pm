@@ -913,6 +913,9 @@ sub install_default_packages {
         virt_utils::lpar_cmd("zypper --non-interactive in nmap iputils bind-utils");
     } else {
         zypper_call '-t in nmap iputils bind-utils', exitcode => [0, 4, 102, 103, 106];
+        # iptables is not pre-installed on SLES 16+, but is required by network
+        # policy setup for KVM guest NAT. Install it if not already present.
+        zypper_call '-t in iptables', exitcode => [0, 4, 102, 103, 106] unless script_run('command -v iptables') == 0;
     }
 }
 

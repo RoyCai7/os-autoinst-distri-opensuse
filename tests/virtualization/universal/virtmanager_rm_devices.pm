@@ -30,7 +30,6 @@ sub run_test {
             mouse_set(0, 0);
             assert_and_click 'virt-manager_details';
 
-            # Workaround for bsc#1172356
             if (check_screen('virt-manager_disk2', timeout => 20)) {
                 assert_and_click 'virt-manager_disk2';
                 assert_screen 'virt-manager_disk2_name';
@@ -57,6 +56,8 @@ sub run_test {
 
             mouse_set(0, 0);
             assert_and_click 'virt-manager_graphical-console';
+            send_key 'alt-f10';       # Ensure maximized state before needle matching
+            wait_still_screen 2;      # Wait for console rendering to stabilize
 
             detect_login_screen() if (!check_screen('virt-manager_viewer_disconnected', 5));
             close_guest();

@@ -1,0 +1,67 @@
+name: sle16-host-upgrade
+description: |
+  Host upgrade test for SLE16 with KVM guests verification.
+  Supports multiple backends and installation methods:
+    - qemu: nested virtualization with BOOT_HDD_IMAGE
+    - ipmi: baremetal with autoyast (15-SP7->16.1) or agama (16.0->16.1)
+  Guests delivered via qcow2 assets (download_guest_assets + restore_guests).
+vars:
+  DESKTOP: textmode
+  HOST_HYPERVISOR: kvm
+  INSTALL_PRODUCT_PATTERNS: kvm_server,kvm_tools
+schedule:
+  - "{{prepare_host_installation}}"
+  - console/system_prepare
+  - "{{network_prepare}}"
+  - "{{prepare_virtualization}}"
+  - yam/migration/restore_upgrade_env
+  - virt_autotest/restore_upgrade_system
+  - "{{migration_module}}"
+  - installation/grub_test
+  - installation/first_boot
+  - yam/validate/validate_migration_logs
+  - yam/validate/validate_connectivity
+  - yam/validate/validate_product
+  - console/validate_repos
+  - "{{verify_virtualization}}"
+conditional_schedule:
+  prepare_host_installation:
+    BACKEND:
+      qemu:
+        - boot/boot_to_desktop
+      ipmi:
+        - installation/ipxe_install
+        - yam/migration/setup_upgrade_env
+        - "{{install_system}}"
+  install_system:
+    ORIGIN_SYSTEM_VERSION:
+      "15-SP7":
+        - autoyast/prepare_profile
+        - installation/bootloader_start
+        - autoyast/installation
+        - installation/first_boot
+      "16.0":
+        - yam/agama/boot_agama
+        - yam/agama/agama_auto
+        - installation/grub_test
+        - installation/first_boot
+  network_prepare:
+    BACKEND:
+      qemu:
+        - console/hostname
+  prepare_virtualization:
+    VIRT_AUTOTEST:
+      "1":
+        - virt_autotest/prepare_non_transactional_server
+        - virt_autotest/download_guest_assets
+        - virt_autotest/restore_guests
+  migration_module:
+    ORIGIN_SYSTEM_VERSION:
+      "15-SP7":
+        - yam/migration/migration_unattended
+      "16.0":
+        - yam/migration/zypper_migration
+  verify_virtualization:
+    VIRT_AUTOTEST:
+      "1":
+        - virt_autotest/verify_virtualization

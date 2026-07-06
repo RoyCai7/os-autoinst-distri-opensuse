@@ -753,7 +753,7 @@ sub hyperv_console_switch {
     } else {
         testapi::x11_start_program('xterm');
     }
-    self->distribution::script_sudo("exec chvt $nr; exit", 0);
+    $self->distribution::script_sudo("exec chvt $nr; exit", 0);
 }
 
 =head2 console_nr

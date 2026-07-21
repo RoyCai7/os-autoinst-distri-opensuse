@@ -71,7 +71,8 @@ sub is_patch_needed {
 sub add_repo_if_not_present {
     my ($url, $name) = @_;
     my $gpg = "";
-    $gpg = "-G" if (get_var('BUILD') =~ m/^MR:/ || get_var('MU_REPOS_NO_GPG_CHECK'));
+    # Transactional systems cannot import staging keys into the read-only RPM DB.
+    $gpg = "-G" if (get_var('BUILD') =~ m/^MR:/ || get_var('MU_REPOS_NO_GPG_CHECK') || (is_transactional && $name =~ /^TEST_/));
     my $system_repos = zypper_repos('-u');
     zypper_call("--no-gpg-checks ar -f $gpg -n '$name' $url '$name'") unless grep { $_->{uri} eq $url } @$system_repos;
 }
@@ -110,7 +111,8 @@ sub add_test_repositories {
     if (get_var("NO_ADD_MAINT_TEST_REPOS")) {
         # If we don't want to add again (and duplicate) repositories that were already added during install,
         # we still need to disable gpg check for all repositories.
-        zypper_call('--gpg-auto-import-keys ref', timeout => 1400, exitcode => [0, 106]);
+        my $gpg = is_transactional ? '--no-gpg-checks' : '--gpg-auto-import-keys';
+        zypper_call("$gpg ref", timeout => 1400, exitcode => [0, 106]);
     } else {
         for my $var (@repos) {
             add_repo_if_not_present("$var", "TEST_$counter");
@@ -121,8 +123,9 @@ sub add_test_repositories {
     # refresh repositories, inf 106 is accepted because repositories with test
     # can be removed before test start
     # For sle16 staging tests, PR should be untrusted key
-    my $import_key = is_sle('>=16') ? '--gpg-auto-import-keys' : '';
-    zypper_call("$import_key ref", timeout => 1400, exitcode => [0, 106]);
+    # Transactional systems need to avoid key imports into the read-only RPM DB.
+    my $gpg = is_transactional ? '--no-gpg-checks' : is_sle('>=16') ? '--gpg-auto-import-keys' : '';
+    zypper_call("$gpg ref", timeout => 1400, exitcode => [0, 106]);
 
     # return the count of repos-1 because counter is increased also on last cycle
     return --$counter;

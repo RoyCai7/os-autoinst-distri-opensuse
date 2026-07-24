@@ -2695,6 +2695,8 @@ sub setup_guest_agama_installation_shell {
 
     my $_timeout_command_prefix = "timeout --kill-after=5";
     my $_ssh_command_options = $self->config_guest_agama_shell_ssh_options();
+    my $_ssh_copy_id_command_options = "-o ConnectTimeout=10 -o ConnectionAttempts=12 $_ssh_command_options";
+    my $_ssh_copy_id_fallback_command_options = "-o ConnectTimeout=10 -o ConnectionAttempts=18 $_ssh_command_options";
 
     $self->get_guest_ipaddr if ($self->{guest_ipaddr_static} ne 'true');
     if ($self->{guest_ipaddr} eq 'NO_IP_ADDRESS_FOUND_AT_THE_MOMENT') {
@@ -2703,10 +2705,10 @@ sub setup_guest_agama_installation_shell {
     }
     else {
         enter_cmd("clear", wait_still_screen => 3);
-        if (script_run("$_timeout_command_prefix 120 ssh-copy-id -f $_ssh_command_options root\@$self->{guest_ipaddr}") != 0) {
+        if (script_run("$_timeout_command_prefix 120 ssh-copy-id -f $_ssh_copy_id_command_options root\@$self->{guest_ipaddr}", timeout => 150) != 0) {
             type_string("reset\n");
             wait_still_screen;
-            enter_cmd("$_timeout_command_prefix 180 ssh-copy-id -f $_ssh_command_options root\@$self->{guest_ipaddr}", wait_still_screen => 5, timeout => 210);
+            enter_cmd("$_timeout_command_prefix 180 ssh-copy-id -f $_ssh_copy_id_fallback_command_options root\@$self->{guest_ipaddr}", wait_still_screen => 5, timeout => 210);
             assert_screen('password-prompt', timeout => 30);
             enter_cmd(get_var('_SECRET_GUEST_PASSWORD', $testapi::password), wait_screen_change => 60, max_interval => 1, timeout => 90);
         }

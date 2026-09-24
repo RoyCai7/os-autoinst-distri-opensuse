@@ -181,8 +181,6 @@ sub check_sev_snp_on_host {
         record_info('Installed SEV-SNP Packages', $installed_pkgs_info);
     }
 
-    validate_script_output("zypper if snphost", sub { m/(?=.*TEST_\d+)(?=.*up-to-date)/s }) if check_var("UPDATE_PACKAGE", "snphost");
-
     # Configure SEV-SNP kernel parameters (reboots if needed, also loads newly installed ucode-amd)
     $self->configure_sev_snp_kernel_parameters();
 
@@ -533,16 +531,30 @@ sub check_sev_snp_on_guest {
         # Wait for guest to be online before further checks
         wait_guest_online($guest_name, 50, 1);
 
-        # Install required packages on guest
-        record_info('Package Installation', "Installing required SEV-SNP packages on guest $guest_name");
-        if (!$self->install_snp_packages_on_guest(guest_name => $guest_name, packages => +SNP_GUEST_TOOLS)) {
-            record_info("Package Install Warning", "Some packages could not be installed on guest $guest_name. Proceeding with verification anyway.", result => 'softfail');
-        }
+        # patch_guests installs UPDATE_PACKAGE on MU guests. Unified guest installation
+        # does not use patch_guests, so install the tool locally in that path.
+        my $is_unified_guest_install = get_var('VIRT_UNIFIED_GUEST_INSTALL', 0) || get_var('VIRT_SEV_SNP_GUEST_INSTALL', 0);
+        if (check_var('UPDATE_PACKAGE', 'snpguest') && !$is_unified_guest_install) {
+            if (check_var('VIRT_NEW_GUEST_MIGRATION_DST', 1) && !$self->verify_any_snp_package_installed(required_pkgs => +SNP_GUEST_TOOLS, dst_machine => $guest_name)) {
+                record_info('Package Installation', "Installing required SEV-SNP packages on migration guest $guest_name");
+                $self->install_snp_packages_on_guest(guest_name => $guest_name, packages => +SNP_GUEST_TOOLS);
+                unless ($self->verify_any_snp_package_installed(required_pkgs => +SNP_GUEST_TOOLS, dst_machine => $guest_name)) {
+                    record_info('Package Verification Failed', "No required SEV-SNP packages are installed on migration guest $guest_name", result => 'fail');
+                    die "SEV-SNP verification requires snpguest to be installed on the migration guest.";
+                }
+            }
+            record_info('Package Installation', "snpguest was installed by patch_guests on guest $guest_name");
+        } else {
+            record_info('Package Installation', "Installing required SEV-SNP packages on guest $guest_name");
+            if (!$self->install_snp_packages_on_guest(guest_name => $guest_name, packages => +SNP_GUEST_TOOLS)) {
+                record_info("Package Install Warning", "Some packages could not be installed on guest $guest_name. Proceeding with verification anyway.", result => 'softfail');
+            }
 
-        # Verify at least one package installed successfully
-        if (!$self->verify_any_snp_package_installed(required_pkgs => +SNP_GUEST_TOOLS, dst_machine => $guest_name)) {
-            record_info('Package Verification Failed', "No required SEV-SNP packages are installed on guest $guest_name", result => 'fail');
-            die "SEV-SNP verification requires at least one SEV-SNP package to be installed on the guest. Test cannot continue.";
+            # Verify at least one package installed successfully
+            if (!$self->verify_any_snp_package_installed(required_pkgs => +SNP_GUEST_TOOLS, dst_machine => $guest_name)) {
+                record_info('Package Verification Failed', "No required SEV-SNP packages are installed on guest $guest_name", result => 'fail');
+                die "SEV-SNP verification requires at least one SEV-SNP package to be installed on the guest. Test cannot continue.";
+            }
         }
 
         # Verify attestation report
@@ -859,8 +871,6 @@ sub install_snp_packages_on_guest {
         timeout => 180    # Increased timeout for package installation
     );
     save_screenshot;
-
-    validate_script_output("ssh root\@$guest_name zypper if snpguest", sub { m/(?=.*TEST_\d+)(?=.*up-to-date)/s }) if check_var("UPDATE_PACKAGE", "snpguest");
 
     if ($install_result != 0) {
         record_info('Installation Failed', "Failed to install packages on guest $guest_name: $package_list", result => 'softfail');

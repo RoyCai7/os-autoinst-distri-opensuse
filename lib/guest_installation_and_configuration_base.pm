@@ -613,7 +613,8 @@ sub config_guest_osinfo {
     $self->reveal_myself;
     my $_current_osinfo_options = $self->{guest_osinfo_options};
     $self->config_guest_params(@_) if (scalar(@_) > 0);
-    my $_guest_osinfo = $self->{guest_osinfo} // $self->{guest_os_variant};
+    my $_guest_osinfo = $self->{guest_osinfo} // '';
+    $_guest_osinfo = $self->{guest_os_variant} // '' if ($_guest_osinfo eq '');
     if (($_guest_osinfo // '') ne '') {
         # Get list of supported OS names on the current host
         my $_supported = script_output('virt-install --osinfo list || virt-install --os-variant list');
@@ -623,9 +624,15 @@ sub config_guest_osinfo {
             $_guest_osinfo = '' unless ($_supported =~ /(?:^|\s)\Q$_guest_osinfo\E(?:\s|$)/);
         }
         $self->{guest_osinfo_options} = ($_guest_osinfo ne '') ? "--osinfo $_guest_osinfo" : "";
-        if (($self->{guest_installation_result} eq 'PASSED') and ($_current_osinfo_options ne $self->{guest_osinfo_options})) {
-            $self->modify_guest_params($self->{guest_name}, 'guest_osinfo_options');
-        }
+    }
+    if (($self->{guest_osinfo_options} eq '') and ($self->{guest_installation_method} eq 'directkernel')) {
+        # Direct kernel installs cannot always be identified from installation media.
+        my $_virt_install_help = script_output('virt-install --help');
+        $self->{guest_osinfo_options} = '--osinfo detect=on,require=off'
+          if ($_virt_install_help =~ /(?:^|\s)--osinfo(?:\s|=|$)/);
+    }
+    if (($self->{guest_installation_result} eq 'PASSED') and ($_current_osinfo_options ne $self->{guest_osinfo_options})) {
+        $self->modify_guest_params($self->{guest_name}, 'guest_osinfo_options');
     }
     inspect_existing_issue(issue => 'bsc#1255476 No SLES16.1 in os database');
     return $self;

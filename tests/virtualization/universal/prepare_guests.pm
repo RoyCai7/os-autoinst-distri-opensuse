@@ -22,6 +22,8 @@ use File::Copy 'copy';
 use File::Path 'make_path';
 use virt_autotest::utils qw(is_sles16_mu_virt_test);
 use autoyast qw(expand_agama_secrets);
+use version_utils qw(is_transactional);
+use Utils::Architectures;
 
 sub create_agama_profile {
     my ($vm_name, $arch, $mac, $ip) = @_;
@@ -40,6 +42,10 @@ sub create_agama_profile {
 
     # Get the Agama configuration template
     my $profile = get_test_data($config_path);
+
+    $profile =~ s/\{\{ARCH\}\}/$arch/g;
+    my $console_args = $arch eq 'ppc64le' ? 'console=hvc0,115200' : 'console=ttyS0,115200 console=tty0';
+    $profile =~ s/\{\{CONSOLE_ARGS\}\}/$console_args/g;
 
     # Expand Agama secrets ({{_SECRET_ED25519_PUB_KEY}} and {{_SECRET_ED25519_PRIV_KEY}})
     $profile = expand_agama_secrets($profile);
@@ -63,7 +69,7 @@ sub create_agama_profile {
     $profile =~ s/\{\{GUEST\}\}/$vm_name/g;
 
     # Handle repositories - only staging mode supported
-    my $incident_repo = get_var('INCIDENT_REPO', '');
+    my $incident_repo = is_transactional && is_sles16_mu_virt_test() ? '' : get_var('INCIDENT_REPO', '');
     $profile =~ s/\{\{INCIDENT_REPO\}\}/$incident_repo/g;
     record_info("Staging Repos", "Using INCIDENT_REPO: $incident_repo") if $incident_repo;
 
@@ -177,6 +183,11 @@ sub run {
     # Use serial terminal, unless defined otherwise. The unless will go away once we are certain this is stable
     #    select_serial_terminal unless get_var('_VIRT_SERIAL_TERMINAL', 1) == 0;
     select_console('root-console');
+    if ((is_aarch64() || is_ppc64le()) && is_sles16_mu_virt_test() && !scalar keys %virt_autotest::common::guests) {
+        die "No guests configured for the SLES 16 " . (is_aarch64() ? 'ARM' : 'PPC64LE') . " virtualization staging test";
+    }
+    record_info("Selected guests", join(', ', sort keys %virt_autotest::common::guests));
+    my $dependencies_preinstalled = is_transactional && is_sles16_mu_virt_test();
     # Note: TBD for modular libvirt. See poo#129086 for detail.
     restart_libvirtd;
     assert_script_run('for i in $(virsh list --name|grep -v Domain-0);do virsh destroy $i;done');
@@ -186,7 +197,7 @@ sub run {
 
 
     # Ensure additional package is installed
-    zypper_call '-t in libvirt-client iputils nmap supportutils';
+    zypper_call '-t in libvirt-client iputils nmap supportutils' unless $dependencies_preinstalled;
     if (script_run("virsh net-list --all | grep default") != 0) {
         assert_script_run "curl " . data_url("virt_autotest/default_network.xml") . " -o ~/default_network.xml";
         assert_script_run "virsh net-define --file ~/default_network.xml";
@@ -205,7 +216,8 @@ sub run {
     foreach my $guest (values %virt_autotest::common::guests) {
         my $method = $guest->{method} // 'virt-install'; # by default install guest using virt-install. SLES11 gets installed via importing a pre-installed guest however
         if ($method eq "virt-install") {
-            $guest->{autoyast} = create_profile($guest->{name}, "x86_64", $guest->{macaddress}, $guest->{ip});
+            my $guest_arch = $guest->{guest_arch} // 'x86_64';
+            $guest->{autoyast} = create_profile($guest->{name}, $guest_arch, $guest->{macaddress}, $guest->{ip});
             record_info("$guest->{autoyast}");
             $guest->{osinfo} = gen_osinfo($guest->{name});
 

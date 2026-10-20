@@ -14,6 +14,7 @@ use warnings;
 use testapi;
 use utils;
 use version_utils 'is_sle';
+use Utils::Architectures;
 
 # Supported guest configuration
 #   * location of the installation tree
@@ -313,6 +314,92 @@ if (get_var("REGRESSION", '') =~ /xen/) {
             launch_security => 'tdx',
         }
     );
+    if (is_aarch64()) {
+        %guests = (
+            sles15sp7_online_aarch64 => {
+                name => 'sles15sp7_online_aarch64',
+                extra_params => '--os-variant sle15-unknown',
+                distro => 'SLE_15',
+                location => 'http://openqa.suse.de/assets/repo/fixed/SLE-15-SP7-Online-aarch64-Build91.1-Media1/',
+                boot_firmware => 'efi',
+                guest_arch => 'aarch64',
+                firmware_package => 'qemu-uefi-aarch64',
+                firmware_path => '/usr/share/qemu/aavmf-aarch64-code.bin',
+                nvram_template => '/usr/share/qemu/aavmf-aarch64-vars.bin',
+            },
+            sles15sp7_full_aarch64 => {
+                name => 'sles15sp7_full_aarch64',
+                extra_params => '--os-variant sle15-unknown',
+                distro => 'SLE_15',
+                location => 'http://openqa.suse.de/assets/repo/fixed/SLE-15-SP7-Full-aarch64-Build91.1-Media1/',
+                boot_firmware => 'efi',
+                guest_arch => 'aarch64',
+                firmware_package => 'qemu-uefi-aarch64',
+                firmware_path => '/usr/share/qemu/aavmf-aarch64-code.bin',
+                nvram_template => '/usr/share/qemu/aavmf-aarch64-vars.bin',
+            },
+            sles16efi_online_aarch64 => {
+                name => 'sles16efi_online_aarch64',
+                extra_params => '--os-variant sles16.0',
+                distro => 'SLE_16',
+                iso_url => 'http://openqa.suse.de/assets/iso/fixed/SLES-16.0-Online-aarch64-GM.install.iso',
+                boot_firmware => 'efi',
+                guest_arch => 'aarch64',
+                firmware_package => 'qemu-uefi-aarch64',
+                firmware_path => '/usr/share/qemu/aavmf-aarch64-code.bin',
+                nvram_template => '/usr/share/qemu/aavmf-aarch64-vars.bin',
+            },
+            sles16efi_full_aarch64 => {
+                name => 'sles16efi_full_aarch64',
+                extra_params => '--os-variant sles16.0',
+                distro => 'SLE_16',
+                location => 'https://download.suse.de/install/SLP/SLES-16.0-Full-LATEST/aarch64/DVD1/',
+                install_url => 'https://download.suse.de/install/SLP/SLES-16.0-Full-LATEST/aarch64/DVD1/install/',
+                boot_firmware => 'efi',
+                guest_arch => 'aarch64',
+                firmware_package => 'qemu-uefi-aarch64',
+                firmware_path => '/usr/share/qemu/aavmf-aarch64-code.bin',
+                nvram_template => '/usr/share/qemu/aavmf-aarch64-vars.bin',
+            },
+            sles16sp1efi_online_aarch64 => {
+                name => 'sles16sp1efi_online_aarch64',
+                extra_params => '--os-variant sles16.1',
+                distro => 'SLE_16',
+                iso_url => 'http://openqa.suse.de/assets/iso/fixed/SLES-16.1-Online-aarch64-GM.install.iso',
+                boot_firmware => 'efi',
+                guest_arch => 'aarch64',
+                firmware_package => 'qemu-uefi-aarch64',
+                firmware_path => '/usr/share/qemu/aavmf-aarch64-code.bin',
+                nvram_template => '/usr/share/qemu/aavmf-aarch64-vars.bin',
+            },
+            sles16sp1efi_full_aarch64 => {
+                name => 'sles16sp1efi_full_aarch64',
+                extra_params => '--os-variant sles16.1',
+                distro => 'SLE_16',
+                location => 'http://openqa.suse.de/assets/repo/fixed/SLES-16.1-Full-aarch64-GM.install/',
+                install_url => 'http://openqa.suse.de/assets/repo/fixed/SLES-16.1-Full-aarch64-GM.install/install/',
+                boot_firmware => 'efi',
+                guest_arch => 'aarch64',
+                firmware_package => 'qemu-uefi-aarch64',
+                firmware_path => '/usr/share/qemu/aavmf-aarch64-code.bin',
+                nvram_template => '/usr/share/qemu/aavmf-aarch64-vars.bin',
+            },
+        );
+    } elsif (is_ppc64le()) {
+        %guests = (
+            sles16efi_online_ppc64le => {
+                name => 'sles16efi_online_ppc64le',
+                extra_params => '--os-variant sles16.0',
+                distro => 'SLE_16',
+                iso_url => 'http://openqa.suse.de/assets/iso/fixed/SLES-16.0-Online-ppc64le-GM.install.iso',
+                guest_arch => 'ppc64le',
+                memory => 4096,
+                maxmemory => 8192,
+                vcpus => 2,
+                maxvcpus => 4,
+            },
+        );
+    }
     # Filter out guests not allowed for the detected SLE version
     if (get_var('ALLOWED_GUESTS', '')) {
         my @allowed_guests = split(',', get_var('ALLOWED_GUESTS'));
@@ -365,16 +452,19 @@ if (get_var("REGRESSION", '') =~ /xen/) {
     } elsif (is_sle('=16.1') || is_sle('=16')) {
         # SLES 16.0 and 16.1 hosts support SLES 15 SP7, SLES 16.0, and SLES 16.1 guests
         # SLES 16 guests only support EFI boot (no BIOS), with online and full installation types
-        my @allowed_guests = qw(sles15sp7 sles15sp7efi sles16efi_online sles16efi_full sles16sp1efi_online sles16sp1efi_full);
-        if (check_var('ENABLE_SRIOV_NETWORK_CARD_PCI_PASSTHROUGH', '1')) {
+        my @allowed_guests = is_aarch64()
+          ? qw(sles15sp7_online_aarch64 sles15sp7_full_aarch64 sles16efi_online_aarch64 sles16efi_full_aarch64 sles16sp1efi_online_aarch64 sles16sp1efi_full_aarch64)
+          : qw(sles15sp7 sles15sp7efi sles16efi_online sles16efi_full sles16sp1efi_online sles16sp1efi_full);
+        @allowed_guests = qw(sles16efi_online_ppc64le) if is_ppc64le();
+        if (!is_aarch64() && !is_ppc64le() && check_var('ENABLE_SRIOV_NETWORK_CARD_PCI_PASSTHROUGH', '1')) {
             @allowed_guests = qw(sles15sp7efi sles16efi_online sles16sp1efi_online);
-        } elsif (check_var('ENABLE_SEV_SNP', '1')) {
+        } elsif (!is_aarch64() && !is_ppc64le() && check_var('ENABLE_SEV_SNP', '1')) {
             @allowed_guests = qw(sles15sp7efi sles16efi_full sles16sp1efi_full);
-        } elsif (check_var('ENABLE_SEV_ES', '1')) {
+        } elsif (!is_aarch64() && !is_ppc64le() && check_var('ENABLE_SEV_ES', '1')) {
             @allowed_guests = qw(sles15sp7-efi-sev-es sles16efi_full-sev-es sles16sp1efi_full-sev-es);
-        } elsif (check_var('ENABLE_TDX', '1')) {
+        } elsif (!is_aarch64() && !is_ppc64le() && check_var('ENABLE_TDX', '1')) {
             @allowed_guests = qw(sles16efi_full-tdx sles16sp1efi_full-tdx);
-        } elsif (check_var('ENABLE_SNAPSHOTS', '1')) {
+        } elsif (!is_aarch64() && !is_ppc64le() && check_var('ENABLE_SNAPSHOTS', '1')) {
             @allowed_guests = qw(sles15sp7efi-snapshot sles16efi_full_snapshot sles16sp1efi_full_snapshot);
         }
         foreach my $guest (keys %guests) {

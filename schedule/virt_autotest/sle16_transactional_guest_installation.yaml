@@ -1,0 +1,33 @@
+name: sle16-transactional-guest-installation
+description: SLE 16 transactional KVM host with a traditional MU guest installation
+vars:
+  TRANSACTIONAL: '1'
+  REGRESSION: kvm
+  KVM: '1'
+  VIRT_AUTOTEST: '0'
+schedule:
+  - '{{host_installation}}'
+  - virt_autotest/login_console
+  - virt_autotest/prepare_transactional_server
+  - virtualization/universal/install_update_package_transactional
+  - virtualization/universal/prepare_guests
+  - virtualization/universal/waitfor_guests
+conditional_schedule:
+  host_installation:
+    ARCH:
+      ppc64le:
+        - installation/bootloader
+        - installation/agama_reboot
+        - installation/grub_test
+        - installation/first_boot
+      x86_64:
+        - '{{host_installation_default}}'
+      aarch64:
+        - '{{host_installation_default}}'
+      s390x:
+        - '{{host_installation_default}}'
+  host_installation_default:
+    DO_NOT_INSTALL_HOST:
+      0:
+        - installation/ipxe_install
+        - installation/agama_reboot

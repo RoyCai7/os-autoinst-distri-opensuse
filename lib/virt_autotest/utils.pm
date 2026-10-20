@@ -689,10 +689,13 @@ sub create_guest {
     my ($guest, $method) = @_;
     my $v_type = $guest->{name} =~ /HVM/ ? "-v" : "";
 
-    # Ensure UEFI firmware package is installed if this guest requires UEFI mode
-    if ($guest->{boot_firmware} && $guest->{boot_firmware} eq 'efi' && script_run("rpm -q ovmf") != 0) {
-        record_info("Installing OVMF", "Installing OVMF package for UEFI support for guest $guest->{name}");
-        zypper_call("in ovmf");
+    # Ensure the required UEFI firmware package is installed.
+    if ($guest->{boot_firmware} && $guest->{boot_firmware} eq 'efi') {
+        my $firmware_package = $guest->{firmware_package} // 'ovmf';
+        if (script_run("rpm -q $firmware_package") != 0) {
+            record_info("Installing UEFI firmware", "Installing $firmware_package for guest $guest->{name}");
+            zypper_call("in $firmware_package");
+        }
     }
 
     my $name = $guest->{name};
@@ -735,6 +738,7 @@ sub create_guest {
     my $memory_backing = $guest->{memory_backing} // '';
     my $extra_args = get_var("VIRTINSTALL_EXTRA_ARGS", "") . " " . get_var("VIRTINSTALL_EXTRA_ARGS_" . uc($name), "");
     $extra_args = trim($extra_args);
+    $extra_args .= ' console=hvc0,115200' if $guest->{guest_arch} && $guest->{guest_arch} eq 'ppc64le';
 
     # Handle installation method: SLES16 online uses ISO download, sle16 full use network location too
     my $install_method = "location";    # Default to network installation (preserves SLES12/15 behavior)
@@ -841,7 +845,12 @@ sub create_guest {
         } else {
             # For SLES16 network installation, use format with explicit kernel/initrd paths
             if (is_sles16_mu_virt_test() && $name =~ /sles16/i) {
-                $virtinstall .= " --location $install_source,kernel=boot/x86_64/loader/linux,initrd=boot/x86_64/loader/initrd";
+                my $guest_arch = $guest->{guest_arch} // 'x86_64';
+                my $loader_arch = $guest_arch eq 'aarch64' ? 'aarch64' : $guest_arch eq 'ppc64le' ? 'ppc64le' : 'x86_64';
+                my $loader_dir = $guest_arch eq 'ppc64le' ? '' : '/loader';
+                my $kernel_path = "boot/$loader_arch$loader_dir/linux";
+                my $initrd_path = "boot/$loader_arch$loader_dir/initrd";
+                $virtinstall .= " --location $install_source,kernel=$kernel_path,initrd=$initrd_path";
                 record_info("Install Method", "Using SLES16 network location with explicit kernel/initrd");
             } else {
                 $virtinstall .= " --location=$install_source";
@@ -851,7 +860,16 @@ sub create_guest {
 
         $virtinstall .= " --wait -1";
         # Configure boot firmware based on guest configuration
-        if ($guest->{boot_firmware} && $guest->{boot_firmware} eq 'efi') {
+        if ($guest->{guest_arch} && $guest->{guest_arch} eq 'ppc64le') {
+            $virtinstall .= ' --arch ppc64le --machine pseries-10.0';
+            record_info("Guest Architecture", "Guest $name configured for ppc64le on pseries-10.0");
+        } elsif ($guest->{guest_arch} && $guest->{guest_arch} eq 'aarch64') {
+            my $firmware = $guest->{firmware_path};
+            my $nvram = $guest->{nvram_template};
+            $virtinstall .= " --arch aarch64 --machine virt --cpu host-passthrough";
+            $virtinstall .= " --boot loader=$firmware,loader.readonly=yes,loader.type=pflash,loader.secure=no,nvram.template=$nvram";
+            record_info("Boot Firmware", "Guest $name configured with AAVMF firmware for aarch64");
+        } elsif ($guest->{boot_firmware} && $guest->{boot_firmware} eq 'efi') {
             # Check if secure boot should be disabled (e.g., for SLES16 with kernel update)
             if ($guest->{boot_firmware_disable_secure}) {
                 $virtinstall .= " --boot loader=/usr/share/qemu/ovmf-x86_64-code.bin,loader.readonly=yes,loader.type=pflash,loader.secure=no";
@@ -2057,7 +2075,7 @@ sub extract_kernel_initrd_from_iso {
     my ($iso_path, $guest_name) = @_;
 
     my $extract_dir = "/var/lib/libvirt/images/${guest_name}";
-    my $mount_point = "/mnt/iso_extract_$$";
+    my $mount_point = "$extract_dir/.iso_extract_$$";
 
     # Create directories and mount ISO
     script_run("mkdir -p $extract_dir $mount_point");
@@ -2067,10 +2085,12 @@ sub extract_kernel_initrd_from_iso {
         return undef;
     }
 
-    # SLES16 specific paths
+    # SLES16 installer paths differ by guest architecture.
+    my $loader_arch = $guest_name =~ /aarch64/ ? 'aarch64' : $guest_name =~ /ppc64le/ ? 'ppc64le' : 'x86_64';
+    my $loader_dir = $guest_name =~ /ppc64le/ ? '' : '/loader';
     my %files = (
-        kernel => "boot/x86_64/loader/linux",
-        initrd => "boot/x86_64/loader/initrd"
+        kernel => "boot/$loader_arch$loader_dir/linux",
+        initrd => "boot/$loader_arch$loader_dir/initrd"
     );
 
     # Extract both files in one operation

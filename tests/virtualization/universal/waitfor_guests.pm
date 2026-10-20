@@ -13,6 +13,7 @@ use virt_autotest::utils;
 use testapi;
 use utils;
 use version_utils 'is_sle';
+use Utils::Architectures;
 
 # Open vnc and take screenshot of guests
 sub screenshot_vnc_guests {
@@ -39,6 +40,10 @@ sub run {
     my $self = shift;
     select_console('root-console');
     my @guests = keys %virt_autotest::common::guests;
+
+    if ((is_aarch64() || is_ppc64le()) && is_sles16_mu_virt_test() && !@guests) {
+        die "No guests configured; refusing to report guest installation success";
+    }
 
     # Wait for guests to announce that installation is complete
     my $retry = 35;
@@ -86,6 +91,11 @@ sub run {
         }
     }
 
+    if ((is_aarch64() || is_ppc64le()) && is_sles16_mu_virt_test()) {
+        record_info("All guests installed", "Guest installation completed");
+        return;    # This staging job validates installation only.
+    }
+
     # Update guests hash with IP/macaddress and add guests to /etc/hosts
     update_guests_ip_mac();
 
@@ -94,6 +104,7 @@ sub run {
     assert_script_run "cat /etc/hosts";
 
     record_info("All guests installed", "Guest installation completed");
+
     if (is_sle('>15') && get_var("KVM")) {
         # Adding the PCI bridges requires the guests to be shutdown
         record_info("shutdown guests", "Shutting down all guests");
